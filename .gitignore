@@ -1,0 +1,66 @@
+ # =====================================
+ # Archivos y carpetas de sistema
+ # =====================================
+ .DS_Store
+ Thumbs.db
+ ehthumbs.db
+ desktop.ini
+ *.log
+
+ # =====================================
+ # IDE: IntelliJ IDEA
+ # =====================================
+ .idea/
+ *.iml
+ *.iws
+ out/
+ *.class
+ *.ipr
+
+ # =====================================
+ # Maven / Gradle
+ # =====================================
+ # Maven
+ target/
+ pom.xml.tag
+ pom.xml.releaseBackup
+ pom.xml.versionsBackup
+ pom.xml.next
+ release.properties
+
+ # =====================================
+ # Spring Boot / Java
+ # =====================================
+ *.jar
+ *.war
+ *.ear
+ *.class
+ *.log
+ *.tmp
+ *.bak
+ hs_err_pid*
+
+ # Dist / build / cache
+ dist/
+ build/
+ out/
+ *.cache
+
+ # =====================================
+ # Entorno / configuración local
+ # =====================================
+ # Configuración de entorno
+ .env
+ .env.local
+ .env.*.local
+
+ # Archivos temporales de bases de datos locales
+ *.h2.db
+ *.mv.db
+
+ # =====================================
+ # Otros
+ # =====================================
+ # Archivos de sistema generados
+ *.swp
+ *~
