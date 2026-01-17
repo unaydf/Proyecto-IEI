@@ -142,17 +142,25 @@ public class WrapperGal {
     }
 
     private Double[] parseCoordenadas(String coordStr) {
-        if (isNullOrEmpty(coordStr)) return new Double[]{null, null};
+        if (coordStr == null || coordStr.trim().isEmpty()) {
+            return new Double[]{null, null};
+        }
+
         String[] parts = coordStr.split(",");
-        if (parts.length != 2) return new Double[]{null, null};
-        Double lat = parseCoordenada(parts[0]);
-        if(lat > 100.0){
-            lat = lat/10.0;
+        if (parts.length != 2) {
+            return new Double[]{null, null};
         }
-        Double lon = parseCoordenada(parts[1]);
-        if(lon > 100.0){
-            lon = lon/10.0;
+
+        Double lat = parseCoordenada(parts[0].trim());
+        if (lat != null && lat > 100.0) {
+            lat = lat / 10.0;
         }
+
+        Double lon = parseCoordenada(parts[1].trim());
+        if (lon != null && lon > 100.0) {
+            lon = lon / 10.0;
+        }
+
         return new Double[]{lat, lon};
     }
 
