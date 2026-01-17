@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscador de Estaciones ITV</title>
+    <link rel="stylesheet" href="css/busqueda.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Buscador de Estaciones ITV</h1>
+        
+        <div class="search-section">
+            <div class="form-group">
+                <label for="localidad">Localidad:</label>
+                <input type="text" id="localidad" placeholder="Ej: Valencia">
+            </div>
+            
+            <div class="form-group">
+                <label for="codigo-postal">Cód. Postal:</label>
+                <input type="text" id="codigo-postal" placeholder="Ej: 46001" maxlength="5">
+            </div>
+            
+            <div class="form-group">
+                <label for="provincia">Provincia:</label>
+                <input type="text" id="provincia" placeholder="Ej: Valencia">
+            </div>
+            
+            <div class="form-group">
+                <label for="tipo">Tipo:</label>
+                <select id="tipo">
+                    <option value="">Todos</option>
+                    <option value="Estacion_fija">Estación Fija</option>
+                    <option value="Estacion_movil">Estación Móvil</option>
+                    <option value="Otros">Otros</option>
+                </select>
+            </div>
+            
+            <div class="button-group">
+                <button id="btn-cancelar" class="btn btn-secondary">Cancelar</button>
+                <button id="btn-buscar" class="btn btn-primary">Buscar</button>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+
+        <div class="results-section">
+            <h2>Resultados de la búsqueda:</h2>
+            <div class="table-container">
+                <table id="results-table">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Tipo</th>
+                            <th>Dirección</th>
+                            <th>Localidad</th>
+                            <th>Cód. postal</th>
+                            <th>Provincia</th>
+                            <th>Descripción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-tbody">
+                        <tr>
+                            <td colspan="7" class="no-results">Realiza una búsqueda para ver resultados</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/busqueda.js"></script>
+</body>
+</html>

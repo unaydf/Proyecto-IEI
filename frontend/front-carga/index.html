@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carga del Almacén de Datos</title>
+    <link rel="stylesheet" href="css/carga.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Carga del Almacén de Datos</h1>
+
+        <div class="form-section">
+            <h2>Seleccione fuente:</h2>
+
+            <div class="checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="check-todas" value="todas">
+                    <span>Seleccionar todas</span>
+                </label>
+
+                <label class="checkbox-label">
+                    <input type="checkbox" class="fuente-checkbox" value="GAL">
+                    <span>Galicia</span>
+                </label>
+
+                <label class="checkbox-label">
+                    <input type="checkbox" class="fuente-checkbox" value="CV">
+                    <span>Comunitat Valenciana</span>
+                </label>
+
+                <label class="checkbox-label">
+                    <input type="checkbox" class="fuente-checkbox" value="CAT">
+                    <span>Catalunya</span>
+                </label>
+            </div>
+
+            <div class="button-group">
+                <button id="btn-cancelar" class="btn btn-secondary">Cancelar</button>
+                <button id="btn-cargar" class="btn btn-primary">Cargar</button>
+                <button id="btn-borrar" class="btn btn-danger">Borrar almacén de datos</button>
+            </div>
+        </div>
+
+        <div class="results-section">
+            <h2>Resultados de la carga:</h2>
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Cargando datos...</p>
+            </div>
+
+            <div id="results-container" class="results-container">
+                <p class="info-text">Selecciona fuentes y haz clic en "Cargar" para empezar</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/carga.js"></script>
+</body>
+
+</html>
