@@ -111,7 +111,7 @@ public class WrapperGalController {
             )
     })
     @GetMapping
-    public ResponseEntity<JsonNode> getWrapperGal() throws Exception {
+    public ResponseEntity<JsonNode> getWrapperGal() {
         try {
             JsonNode json = wrapperGal.convertirCSVaJSON("src/main/resources/Estacions_ITV.csv");
             return ResponseEntity.ok(json); // 200 OK
