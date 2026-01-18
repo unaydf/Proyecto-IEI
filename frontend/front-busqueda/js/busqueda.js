@@ -36,6 +36,7 @@ function limpiarResultados() {
 // Buscar estaciones
 async function buscarEstaciones() {
     ocultarError();
+    ocultarInfo();
 
     const localidad = document.getElementById('localidad').value.trim();
     const codigoPostal = document.getElementById('codigo-postal').value.trim();
@@ -86,10 +87,23 @@ function mostrarResultados(estaciones) {
     const tbody = document.getElementById('results-tbody');
 
     if (estaciones.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="no-results">No se encontraron resultados</td></tr>';
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="no-results">
+                    No se encontraron estaciones con los criterios indicados
+                </td>
+            </tr>
+        `;
+
+        mostrarInfo(
+            'Sin resultados',
+            'No se han encontrado estaciones ITV que coincidan con la búsqueda realizada.'
+        );
+
         return;
     }
 
+    ocultarInfo();
     tbody.innerHTML = '';
 
     estaciones.forEach(estacion => {
@@ -158,6 +172,22 @@ function mostrarError(titulo, mensaje) {
 
 function ocultarError() {
     document.getElementById('error-box').classList.add('hidden');
+}
+
+function mostrarInfo(titulo, mensaje) {
+    const infoBox = document.getElementById('info-box');
+    document.getElementById('info-title').textContent = titulo;
+    document.getElementById('info-message').textContent = mensaje;
+
+    infoBox.classList.remove('hidden');
+
+    setTimeout(() => {
+        infoBox.classList.add('hidden');
+    }, 5000);
+}
+
+function ocultarInfo() {
+    document.getElementById('info-box').classList.add('hidden');
 }
 
 // Event listeners
