@@ -66,14 +66,6 @@ public class ExtractorGal {
                     continue;
                 }
 
-                boolean reparado = !original.equals(estacion);
-                if (reparado) {
-                    resultado.setRegistrosConErroresReparados(resultado.getRegistrosConErroresReparados() + 1);
-                    resultado.getErroresReparados().add(
-                            new ResultadoCargaDTO.ErrorReparado("GAL", nombreEstacion, localidadNombre, "Valores limpiados", "INSERT")
-                    );
-                }
-
                 // --------------------------
                 // Provincias
                 // --------------------------
@@ -99,11 +91,32 @@ public class ExtractorGal {
                 );
 
                 // --------------------------
-                // Estaciones
+                // Estaciones - PRIMERO verificar duplicados
                 // --------------------------
                 if (!estacionExiste(conn, nombreEstacion, localidadId)) {
+                    // No es duplicado, verificar si hubo limpieza
+                    boolean reparado = !original.equals(estacion);
+                    if (reparado) {
+                        resultado.setRegistrosConErroresReparados(resultado.getRegistrosConErroresReparados() + 1);
+                        resultado.getErroresReparados().add(
+                                new ResultadoCargaDTO.ErrorReparado("GAL", nombreEstacion, localidadNombre, "Valores limpiados", "INSERT")
+                        );
+                    }
+
                     insertarEstacion(conn, estacion, localidadId);
                     resultado.setRegistrosCorrectos(resultado.getRegistrosCorrectos() + 1);
+                } else {
+                    // Registro duplicado - se añade como error reparado (IGNORADO tiene prioridad)
+                    resultado.getErroresReparados().add(
+                            new ResultadoCargaDTO.ErrorReparado(
+                                    "GAL",
+                                    nombreEstacion,
+                                    localidadNombre,
+                                    "Registro duplicado",
+                                    "Ignorado"
+                            )
+                    );
+                    resultado.setRegistrosConErroresReparados(resultado.getRegistrosConErroresReparados() + 1);
                 }
             }
 
@@ -226,4 +239,3 @@ public class ExtractorGal {
         }
     }
 }
-
