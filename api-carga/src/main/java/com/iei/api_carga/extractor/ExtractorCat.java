@@ -156,14 +156,14 @@ public class ExtractorCat {
         JsonNode value = node.get(field);
         if (value == null || !value.isNumber()) return null;
         double v = value.asDouble();
-        return (v >= 39 && v <= 46) ? v : null;
+        return (v >= 40 && v <= 43) ? v : null;
     }
 
     private Double safeCoordinateLong(JsonNode node, String field) {
         JsonNode value = node.get(field);
         if (value == null || !value.isNumber()) return null;
         double v = value.asDouble();
-        return (v >= -9 && v <= -4) ? v : null;
+        return (v >= 0 && v <= 4) ? v : null;
     }
 
     private void insertarEstacion(Connection conn, JsonNode estacion, long localidadId) throws SQLException {

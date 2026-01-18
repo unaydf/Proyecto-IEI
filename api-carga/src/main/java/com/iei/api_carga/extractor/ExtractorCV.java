@@ -190,13 +190,13 @@ public class ExtractorCV {
     private Double safeCoordinateLat(JsonNode node) {
         if (node == null || !node.isNumber()) return null;
         double v = node.asDouble();
-        return (v >= 38 && v <= 42) ? v : null; // Valencia aproximada
+        return (v >= 37.7 && v <= 42) ? v : null; // Comunidad valenciana aproximada
     }
 
     private Double safeCoordinateLong(JsonNode node) {
         if (node == null || !node.isNumber()) return null;
         double v = node.asDouble();
-        return (v >= -1 && v <= 1) ? v : null; // Valencia aproximada
+        return (v >= -1 && v <= 1) ? v : null; // Comunidad valenciana aproximada
     }
 
     // =========================================
