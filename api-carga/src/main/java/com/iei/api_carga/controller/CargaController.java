@@ -70,8 +70,7 @@ public class CargaController {
                                         - CAT (Catalunya)
                                         - GAL (Galicia)
                                         """, example = "[\"CV\", \"CAT\", \"GAL\"]", required = true) @RequestParam List<String> fuentes) {
-        cargaService.cargarDatos(fuentes);
-        ResultadoCargaDTO resultadoCargaDTO = new ResultadoCargaDTO();
+        ResultadoCargaDTO resultadoCargaDTO = cargaService.cargarDatos(fuentes);
         return ResponseEntity.ok(resultadoCargaDTO);
     }
 

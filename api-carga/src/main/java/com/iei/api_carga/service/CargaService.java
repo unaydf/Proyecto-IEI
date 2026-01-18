@@ -1,6 +1,7 @@
 package com.iei.api_carga.service;
 
 import com.iei.api_carga.client.CargaClient;
+import com.iei.api_carga.dto.ResultadoCargaDTO;
 import com.iei.api_carga.extractor.ExtractorCV;
 import com.iei.api_carga.extractor.ExtractorCat;
 import com.iei.api_carga.extractor.ExtractorGal;
@@ -9,8 +10,9 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.JsonNode;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -36,31 +38,56 @@ public class CargaService {
     }
 
     @Transactional
-    public void cargarDatos(List<String> fuentes){
+    public ResultadoCargaDTO cargarDatos(List<String> fuentes){
+        int totalCorrectos = 0;
+        int totalErroresReparados = 0;
+        int totalRechazados = 0;
+
+        List<ResultadoCargaDTO.ErrorReparado> erroresReparados = new ArrayList<>();
+        List<ResultadoCargaDTO.ErrorRechazado> erroresRechazados = new ArrayList<>();
+
         for (String fuente : fuentes) {
             try {
+                ResultadoCargaDTO resultado = null;
                 switch (fuente.toUpperCase()) {
                     case "GAL":
                         JsonNode jsonGal = cargaClient.getEstacionesGalicia();
-                        extractorGal.insertar(jsonGal);
+                        resultado = extractorGal.insertar(jsonGal);
                         break;
                     case "CAT":
                         JsonNode jsonCat = cargaClient.getEstacionesCatalunya();
-                        extractorCat.insertar(jsonCat);
+                        //resultado = extractorCat.insertar(jsonCat);
                         break;
-
                     case "CV":
                         JsonNode jsonCV = cargaClient.getEstacionesCV();
-                        extractorCV.insertar(jsonCV);
+                        //resultado = extractorCV.insertar(jsonCV);
                         break;
                     default:
                         throw new RuntimeException("Fuente desconocida: " + fuente);
                 }
+
+                if (resultado != null) {
+                    totalCorrectos += resultado.getRegistrosCorrectos();
+                    totalErroresReparados += resultado.getRegistrosConErroresReparados();
+                    totalRechazados += resultado.getRegistrosRechazados();
+
+                    if (resultado.getErroresReparados() != null) erroresReparados.addAll(resultado.getErroresReparados());
+                    if (resultado.getErroresRechazados() != null) erroresRechazados.addAll(resultado.getErroresRechazados());
+                }
+
             } catch (Exception e) {
                 System.err.println("Error cargando fuente " + fuente + ": " + e.getMessage());
                 e.printStackTrace();
             }
         }
+
+        return new ResultadoCargaDTO(
+                totalCorrectos,
+                totalErroresReparados,
+                totalRechazados,
+                erroresReparados,
+                erroresRechazados
+        );
     }
 
     @Transactional
