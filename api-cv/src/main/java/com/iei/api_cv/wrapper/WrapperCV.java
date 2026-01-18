@@ -48,7 +48,7 @@ public class WrapperCV {
                 double[] coords = CoordenadasService.obtenerLatLon(direccion);
 
                 estacion.put("nombre", "Estación ITV de " + municipio);
-                estacion.put("tipo", "Estacion fija");
+                estacion.put("tipo", "Estacion_fija");
                 estacion.put("direccion", direccion);
                 estacion.put("codigo_postal", cp);
                 estacion.put("provincia_nombre", provincia);
@@ -59,8 +59,8 @@ public class WrapperCV {
 
             else if (tipoRaw.contains("móvil")) {
 
-                estacion.put("nombre", "Estación ITV Móvil " + direccion);
-                estacion.put("tipo", "Estacion movil");
+                estacion.put("nombre", "Estación " + direccion);
+                estacion.put("tipo", "Estacion_movil");
 
                 estacion.putNull("direccion");
                 estacion.putNull("codigo_postal");

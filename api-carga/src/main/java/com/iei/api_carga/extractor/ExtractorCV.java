@@ -112,7 +112,7 @@ public class ExtractorCV {
             valido = false;
         } else {
             // Validar móviles, agrícolas y "Otros"
-            if ("Estacion movil".equalsIgnoreCase(tipo) ||
+            if ("Estacion_movil".equalsIgnoreCase(tipo) ||
                     "Agricola".equalsIgnoreCase(tipo) ||
                     "Otros".equalsIgnoreCase(tipo)) {
 
@@ -145,7 +145,7 @@ public class ExtractorCV {
                 }
             }
             // Validar estaciones fijas
-            else if ("Estacion fija".equalsIgnoreCase(tipo)) {
+            else if ("Estacion_fija".equalsIgnoreCase(tipo)) {
                 if (nombre == null || nombre.isEmpty()) {
                     motivo.append("Nombre de estación vacío. ");
                     valido = false;
