@@ -31,6 +31,9 @@ public class ExtractorCat {
     );
 
     public ResultadoCargaDTO insertar(JsonNode estacionesArray) throws Exception {
+        provinciaCache.clear();
+        localidadCache.clear();
+
         ResultadoCargaDTO resultado = new ResultadoCargaDTO();
         resultado.setErroresRechazados(new java.util.ArrayList<>());
         resultado.setErroresReparados(new java.util.ArrayList<>());

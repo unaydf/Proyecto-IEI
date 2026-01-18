@@ -49,10 +49,6 @@ public class WrapperCV {
 
                 estacion.put("nombre", "Estación ITV de " + municipio);
                 estacion.put("tipo", "Estacion_fija");
-                estacion.put("direccion", direccion);
-                estacion.put("codigo_postal", cp);
-                estacion.put("provincia_nombre", provincia);
-                estacion.put("localidad_nombre", municipio);
                 estacion.put("latitud", coords[0]);
                 estacion.put("longitud", coords[1]);
             }
@@ -62,28 +58,25 @@ public class WrapperCV {
                 estacion.put("nombre", "Estación " + direccion);
                 estacion.put("tipo", "Estacion_movil");
 
-                estacion.putNull("direccion");
-                estacion.putNull("codigo_postal");
-                estacion.putNull("provincia_nombre");
-                estacion.putNull("localidad_nombre");
                 estacion.putNull("latitud");
                 estacion.putNull("longitud");
             }
 
             else if (tipoRaw.contains("agrícola")) {
 
-                estacion.put("nombre", "Estación ITV Agrícola " + direccion);
+                estacion.put("nombre", "Estación " + direccion);
                 estacion.put("tipo", "Otros");
 
-                estacion.putNull("direccion");
-                estacion.putNull("codigo_postal");
-                estacion.putNull("provincia_nombre");
-                estacion.putNull("localidad_nombre");
                 estacion.putNull("latitud");
                 estacion.putNull("longitud");
             }
 
             else continue;
+
+            estacion.put("direccion", direccion);
+            estacion.put("codigo_postal", cp);
+            estacion.put("provincia_nombre", provincia);
+            estacion.put("localidad_nombre", municipio);
 
             estacion.put("horario", horario);
             estacion.put("descripcion", direccion + " / " + horario);

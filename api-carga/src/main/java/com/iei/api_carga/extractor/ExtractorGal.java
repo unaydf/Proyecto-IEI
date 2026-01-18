@@ -35,6 +35,8 @@ public class ExtractorGal {
     );
 
     public ResultadoCargaDTO insertar(JsonNode root) throws Exception {
+        provinciaCache.clear();
+        localidadCache.clear();
 
         ResultadoCargaDTO resultado = new ResultadoCargaDTO();
         resultado.setErroresReparados(new ArrayList<>());

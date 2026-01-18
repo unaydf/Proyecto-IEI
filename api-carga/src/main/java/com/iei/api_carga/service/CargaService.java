@@ -90,8 +90,10 @@ public class CargaService {
 
     @Transactional
     public void eliminarDatos() {
-        em.createNativeQuery("TRUNCATE TABLE estacion CASCADE").executeUpdate();
-        em.createNativeQuery("TRUNCATE TABLE localidad CASCADE").executeUpdate();
-        em.createNativeQuery("TRUNCATE TABLE provincia CASCADE").executeUpdate();
+        em.createNativeQuery("""
+        TRUNCATE TABLE estacion, localidad, provincia
+        RESTART IDENTITY
+        CASCADE
+    """).executeUpdate();
     }
 }

@@ -24,6 +24,9 @@ public class ExtractorCV {
     private final Map<String, Long> localidadCache = new HashMap<>();
 
     public ResultadoCargaDTO insertar(JsonNode estacionesArray) throws Exception {
+        provinciaCache.clear();
+        localidadCache.clear();
+
         ResultadoCargaDTO resultado = new ResultadoCargaDTO();
         resultado.setErroresRechazados(new java.util.ArrayList<>());
         resultado.setErroresReparados(new java.util.ArrayList<>());
@@ -112,23 +115,16 @@ public class ExtractorCV {
             valido = false;
         } else {
             // Validar móviles, agrícolas y "Otros"
-            if ("Estacion_movil".equalsIgnoreCase(tipo) ||
-                    "Agricola".equalsIgnoreCase(tipo) ||
-                    "Otros".equalsIgnoreCase(tipo)) {
+            if ("Estacion_movil".equalsIgnoreCase(tipo) || "Otros".equalsIgnoreCase(tipo)) {
 
                 // Verificar que NO tengan los campos prohibidos
                 boolean tieneLocalidad = localidad != null && !localidad.isEmpty() && !localidad.equals("null");
-                boolean tieneProvincia = provincia != null && !provincia.isEmpty() && !provincia.equals("null");
                 boolean tieneCP = cp != null && !cp.isEmpty() && !cp.equals("null");
                 boolean tieneLat = latStr != null && !latStr.isEmpty() && !latStr.equals("null");
                 boolean tieneLon = lonStr != null && !lonStr.isEmpty() && !lonStr.equals("null");
 
                 if (tieneLocalidad) {
                     motivo.append("Estación móvil/agrícola/otro no puede tener localidad. ");
-                    valido = false;
-                }
-                if (tieneProvincia) {
-                    motivo.append("Estación móvil/agrícola/otro no puede tener provincia. ");
                     valido = false;
                 }
                 if (tieneCP) {
@@ -209,9 +205,7 @@ public class ExtractorCV {
         String tipo = safeText(estacion.get("tipo"));
 
         // Móviles, Agrícolas, Otros: Asignar campos como string "null"
-        if ("Estacion movil".equalsIgnoreCase(tipo) ||
-                "Agricola".equalsIgnoreCase(tipo) ||
-                "Otros".equalsIgnoreCase(tipo)) {
+        if ("Estacion movil".equalsIgnoreCase(tipo) || "Otros".equalsIgnoreCase(tipo)) {
             e.put("localidad_nombre", "null");
             e.put("provincia_nombre", "null");
             e.put("codigo_postal", "null");
