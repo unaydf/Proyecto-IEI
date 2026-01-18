@@ -65,7 +65,7 @@ public class WrapperCVController {
                       {
                         "cod_estacion": 1,
                         "nombre": "Estación ITV de Valencia",
-                        "tipo": "Estación fija",
+                        "tipo": "Estacion_fija",
                         "direccion": "Av. del Cid, 152",
                         "codigo_postal": "46014",
                         "descripcion": "Av. del Cid, 152 / 08:00-20:00",

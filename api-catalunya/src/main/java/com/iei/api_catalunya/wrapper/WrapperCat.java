@@ -61,7 +61,7 @@ public class WrapperCat {
             if (isNullOrEmpty(cp) && isNullOrEmpty(direccion)) {
                 estacion.put("tipo", "Otros");
             } else {
-                estacion.put("tipo", "Estación_fija");
+                estacion.put("tipo", "Estacion_fija");
             }
 
             estacion.put("direccion", direccion);

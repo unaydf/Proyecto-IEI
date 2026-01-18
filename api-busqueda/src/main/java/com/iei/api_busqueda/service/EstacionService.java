@@ -21,7 +21,7 @@ public class EstacionService {
 
         if (tipoStr != null && !tipoStr.isBlank()) {
             try {
-                tipo = Tipo.valueOf(tipoStr.toUpperCase());
+                tipo = Tipo.valueOf(tipoStr);
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("El tipo de estación indicado no es válido");
             }
