@@ -35,6 +35,9 @@ function limpiarResultados() {
 
 // Buscar estaciones
 async function buscarEstaciones() {
+    ocultarError();
+    ocultarInfo();
+
     const localidad = document.getElementById('localidad').value.trim();
     const codigoPostal = document.getElementById('codigo-postal').value.trim();
     const provincia = document.getElementById('provincia').value.trim();
@@ -64,7 +67,18 @@ async function buscarEstaciones() {
 
     } catch (error) {
         console.error('Error:', error);
-        alert('Error al buscar estaciones: ' + error.message);
+
+        if (error instanceof TypeError) {
+            mostrarError(
+                'No se pudo conectar con el servidor',
+                'El servicio de búsqueda no está disponible en este momento. Inténtalo más tarde.'
+            );
+        } else {
+            mostrarError(
+                'Error en la búsqueda',
+                error.message || 'Se produjo un error inesperado'
+            );
+        }
     }
 }
 
@@ -73,10 +87,23 @@ function mostrarResultados(estaciones) {
     const tbody = document.getElementById('results-tbody');
 
     if (estaciones.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="no-results">No se encontraron resultados</td></tr>';
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="no-results">
+                    No se encontraron estaciones con los criterios indicados
+                </td>
+            </tr>
+        `;
+
+        mostrarInfo(
+            'Sin resultados',
+            'No se han encontrado estaciones ITV que coincidan con la búsqueda realizada.'
+        );
+
         return;
     }
 
+    ocultarInfo();
     tbody.innerHTML = '';
 
     estaciones.forEach(estacion => {
@@ -128,6 +155,39 @@ function mostrarEnMapa(estaciones) {
     if (bounds.length > 0) {
         map.fitBounds(bounds, { padding: [50, 50] });
     }
+}
+
+function mostrarError(titulo, mensaje) {
+    const errorBox = document.getElementById('error-box');
+    document.getElementById('error-title').textContent = titulo;
+    document.getElementById('error-message').textContent = mensaje;
+
+    errorBox.classList.remove('hidden');
+
+    // Ocultar automáticamente tras 6 segundos
+    setTimeout(() => {
+        errorBox.classList.add('hidden');
+    }, 6000);
+}
+
+function ocultarError() {
+    document.getElementById('error-box').classList.add('hidden');
+}
+
+function mostrarInfo(titulo, mensaje) {
+    const infoBox = document.getElementById('info-box');
+    document.getElementById('info-title').textContent = titulo;
+    document.getElementById('info-message').textContent = mensaje;
+
+    infoBox.classList.remove('hidden');
+
+    setTimeout(() => {
+        infoBox.classList.add('hidden');
+    }, 5000);
+}
+
+function ocultarInfo() {
+    document.getElementById('info-box').classList.add('hidden');
 }
 
 // Event listeners
