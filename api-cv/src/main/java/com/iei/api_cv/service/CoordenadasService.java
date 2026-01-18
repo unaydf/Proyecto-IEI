@@ -17,19 +17,34 @@ public class CoordenadasService {
         try {
             driver.get("https://www.coordenadas-gps.com/convertidor-de-coordenadas-gps");
             try {
-                By botonCookies = By.xpath(
-                        "//*[contains(text(),'Consent') or " +
-                                "contains(text(),'Aceptar') or " +
-                                "contains(text(),'Accept') or " +
-                                "contains(text(),'OK')]"
+                WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(10));
+
+                // Esperar a que el banner esté presente
+                WebElement consentRoot = shortWait.until(
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.className("fc-consent-root")
+                        )
                 );
 
-                WebElement btn = new WebDriverWait(driver, Duration.ofSeconds(5))
-                        .until(ExpectedConditions.elementToBeClickable(botonCookies));
+                // Botón "Consentir" EXACTO según el DOM
+                WebElement consentButton = shortWait.until(
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.cssSelector("button.fc-cta-consent.fc-primary-button")
+                        )
+                );
 
-                btn.click();
-            } catch (Exception ignored) {
-                System.out.println("⚠ No se encontró banner de cookies, continuando...");
+                // Click forzado por JavaScript (imprescindible)
+                ((JavascriptExecutor) driver).executeScript(
+                        "arguments[0].click();", consentButton
+                );
+
+                // Esperar a que el banner desaparezca
+                shortWait.until(
+                        ExpectedConditions.invisibilityOf(consentRoot)
+                );
+
+            } catch (Exception e) {
+                System.out.println("⚠ No se pudo cerrar el banner de cookies");
             }
             WebElement input = wait.until(
                     ExpectedConditions.visibilityOfElementLocated(By.id("address"))
