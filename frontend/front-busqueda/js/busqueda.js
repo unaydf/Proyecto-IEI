@@ -40,21 +40,18 @@ async function buscarEstaciones() {
     const provincia = document.getElementById('provincia').value.trim();
     const tipo = document.getElementById('tipo').value;
 
-    // Crear objeto de búsqueda
-    const busqueda = {
-        localidad: localidad || null,
-        codigoPostal: codigoPostal || null,
-        provincia: provincia || null,
-        tipo: tipo || null
-    };
+    const params = new URLSearchParams();
+
+    if (localidad) params.append('localidad', localidad);
+    if (codigoPostal) params.append('codigoPostal', codigoPostal);
+    if (provincia) params.append('provincia', provincia);
+    if (tipo) params.append('tipo', tipo);
+
+    const url = `${API_URL}/estaciones?${params.toString()}`;
 
     try {
-        const response = await fetch(`${API_URL}/estaciones`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(busqueda)
+        const response = await fetch(url, {
+            method: 'GET'
         });
 
         if (!response.ok) {

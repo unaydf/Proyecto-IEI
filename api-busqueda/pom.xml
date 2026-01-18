@@ -12,7 +12,7 @@
 	<artifactId>api-busqueda</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>api-busqueda</name>
-	<description>Demo project for Spring Boot</description>
+	<description>API de busqueda de datos de las Estaciones ITV</description>
 	<url/>
 	<licenses>
 		<license/>
@@ -53,6 +53,13 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
+		</dependency>
+
+		<!-- OpenAPI / Swagger -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>2.3.0</version>
 		</dependency>
 	</dependencies>
 

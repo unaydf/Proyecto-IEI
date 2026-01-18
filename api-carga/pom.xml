@@ -12,7 +12,7 @@
 	<artifactId>api-carga</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>api-carga</name>
-	<description>Demo project for Spring Boot</description>
+	<description>API de carga de datos de las Estaciones ITV</description>
 	<url/>
 	<licenses>
 		<license/>
