@@ -105,53 +105,80 @@ public class ExtractorCV {
         Double lat = safeCoordinateLat(e.get("latitud"));
         Double lon = safeCoordinateLong(e.get("longitud"));
 
-        boolean valido = true;
-        String motivo = "";
+        boolean valido = true; // Asumimos que es válido al principio
+        StringBuilder motivo = new StringBuilder(); // Motivo para rechazo
 
         if (tipo == null) {
-            motivo = "Tipo de estación nulo";
+            motivo.append("Tipo de estación nulo. ");
             valido = false;
-        } else if ("Estacion movil".equalsIgnoreCase(tipo) ||
-                "Agricola".equalsIgnoreCase(tipo) ||
-                "Otros".equalsIgnoreCase(tipo)) {
+        } else {
+            // Validar móviles, agrícolas y "Otros"
+            if ("Estacion movil".equalsIgnoreCase(tipo) ||
+                    "Agricola".equalsIgnoreCase(tipo) ||
+                    "Otros".equalsIgnoreCase(tipo)) {
 
-            // Para estas, CP y localidad no deben estar
-            if ((cp != null && !cp.isEmpty()) || (localidad != null && !localidad.isEmpty())) {
-                motivo = "Estación móvil/agrícola con ubicación fija";
-                valido = false;
-            }
-            // Debe tener contacto válido
-            if (contacto == null || !contacto.contains("@")) {
-                motivo = "Contacto inválido";
-                valido = false;
-            }
-
-        } else if ("Estacion fija".equalsIgnoreCase(tipo)) {
-            if (nombre == null || nombre.isEmpty() ||
-                    localidad == null || localidad.isEmpty() ||
-                    provincia == null || provincia.isEmpty() ||
-                    cp == null || !cp.matches("\\d{5}") ||
-                    lat == null || lon == null ||
-                    contacto == null || !contacto.contains("@")) {
-
-                motivo = "Campos obligatorios inválidos o coordenadas fuera de rango";
-                valido = false;
-            } else {
-                // Validar prefijo CP para Comunidad Valenciana
-                String prefijo = cp.substring(0, 2);
-                if (!prefijo.matches("03|12|46")) {
-                    motivo = "CP no pertenece a Comunidad Valenciana";
+                // Verificar que esos campos estén marcados explícitamente como "null"
+                if (!"null".equals(localidad)) {
+                    motivo.append("Localidad debe ser 'null' para estaciones móviles/agrícolas/otros. ");
+                    valido = false;
+                }
+                if (!"null".equals(provincia)) {
+                    motivo.append("Provincia debe ser 'null' para estaciones móviles/agrícolas/otros. ");
+                    valido = false;
+                }
+                if (!"null".equals(cp)) {
+                    motivo.append("Código postal debe ser 'null' para estaciones móviles/agrícolas/otros. ");
+                    valido = false;
+                }
+                if (!"null".equals(e.get("latitud").asText()) || !"null".equals(e.get("longitud").asText())) {
+                    motivo.append("Coordenadas deben ser 'null' para estaciones móviles/agrícolas/otros. ");
                     valido = false;
                 }
             }
-        } else {
-            motivo = "Tipo desconocido";
-            valido = false;
+
+            // Validar estaciones fijas
+            else if ("Estacion fija".equalsIgnoreCase(tipo)) {
+                if (nombre == null || nombre.isEmpty()) {
+                    motivo.append("Nombre de estación vacío. ");
+                    valido = false;
+                }
+                if (localidad == null || localidad.isEmpty()) {
+                    motivo.append("Localidad vacía para estación fija. ");
+                    valido = false;
+                }
+                if (provincia == null || provincia.isEmpty()) {
+                    motivo.append("Provincia vacía para estación fija. ");
+                    valido = false;
+                }
+                if (cp == null || !cp.matches("\\d{5}")) {
+                    motivo.append("Código postal inválido o ausente: ").append(cp).append(". ");
+                    valido = false;
+                } else {
+                    // Validar prefijo CP
+                    String prefijo = cp.substring(0, 2);
+                    if (!prefijo.matches("03|12|46")) {
+                        motivo.append("CP no pertenece a la Comunidad Valenciana: ").append(cp).append(". ");
+                        valido = false;
+                    }
+                }
+                if (lat == null || lon == null) {
+                    motivo.append("Coordenadas inválidas o fuera de rango (lat: ").append(lat).append(", lon: ").append(lon).append("). ");
+                    valido = false;
+                }
+            } else {
+                motivo.append("Tipo desconocido: ").append(tipo).append(". ");
+                valido = false;
+            }
         }
 
         if (!valido) {
             resultado.getErroresRechazados().add(
-                    new ResultadoCargaDTO.ErrorRechazado("CV", nombre, localidad, motivo)
+                    new ResultadoCargaDTO.ErrorRechazado(
+                            "CV",
+                            nombre,
+                            localidad,
+                            motivo.toString()
+                    )
             );
             resultado.setRegistrosRechazados(resultado.getRegistrosRechazados() + 1);
         }
@@ -166,6 +193,21 @@ public class ExtractorCV {
         if (!(estacion instanceof ObjectNode)) return;
         ObjectNode e = (ObjectNode) estacion;
 
+        String tipo = safeText(estacion.get("tipo"));
+        if (tipo == null) tipo = "Otros"; // Si es nulo, asumir "Otros" para evitar problemas en validación
+
+        // Móviles, Agrícolas, Otros: Asignar campos como "null"
+        if ("Estacion movil".equalsIgnoreCase(tipo) ||
+                "Agricola".equalsIgnoreCase(tipo) ||
+                "Otros".equalsIgnoreCase(tipo)) {
+            e.put("localidad_nombre", "null");
+            e.put("provincia_nombre", "null");
+            e.put("codigo_postal", "null");
+            e.put("latitud", "null");
+            e.put("longitud", "null");
+        }
+
+        // Limpieza común para todos los campos
         e.put("nombre", clean(safeText(estacion.get("nombre"))));
         e.put("direccion", clean(safeText(estacion.get("direccion"))));
         e.put("codigo_postal", clean(safeText(estacion.get("codigo_postal"))));
@@ -174,13 +216,16 @@ public class ExtractorCV {
         e.put("contacto", clean(safeText(estacion.get("contacto"))));
         e.put("URL", clean(safeText(estacion.get("URL"))));
 
-        e.put("latitud", safeCoordinateLat(estacion.get("latitud")));
-        e.put("longitud", safeCoordinateLong(estacion.get("longitud")));
+        // Coordenadas para estaciones fijas o verificar rango
+        if (!"Estacion movil".equalsIgnoreCase(tipo) && !"Agricola".equalsIgnoreCase(tipo) && !"Otros".equalsIgnoreCase(tipo)) {
+            e.put("latitud", safeCoordinateLat(estacion.get("latitud")));
+            e.put("longitud", safeCoordinateLong(estacion.get("longitud")));
+        }
     }
 
     private String clean(String s) {
         if (s == null) return null;
-        return s.replaceAll("[^\\p{L}\\p{N}\\s.,-]", "").trim();
+        return s.replaceAll("[^\\p{L}\\p{N}\\s.,@-]", "").trim();
     }
 
     private String safeText(JsonNode node) {
