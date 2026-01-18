@@ -62,7 +62,7 @@ public class WrapperCV {
             else if (tipoRaw.contains("móvil")) {
 
                 estacion.put("nombre", "Estación ITV Móvil " + (contadorMovil++));
-                estacion.put("tipo", "Estacion móvil");
+                estacion.put("tipo", "Estacion movil");
 
                 estacion.putNull("direccion");
                 estacion.putNull("codigo_postal");

@@ -111,7 +111,7 @@ public class ExtractorCV {
         if (tipo == null) {
             motivo = "Tipo de estación nulo";
             valido = false;
-        } else if ("Estación móvil".equalsIgnoreCase(tipo) ||
+        } else if ("Estacion movil".equalsIgnoreCase(tipo) ||
                 "Agricola".equalsIgnoreCase(tipo) ||
                 "Otros".equalsIgnoreCase(tipo)) {
 
@@ -126,7 +126,7 @@ public class ExtractorCV {
                 valido = false;
             }
 
-        } else if ("Estación fija".equalsIgnoreCase(tipo)) {
+        } else if ("Estacion fija".equalsIgnoreCase(tipo)) {
             if (nombre == null || nombre.isEmpty() ||
                     localidad == null || localidad.isEmpty() ||
                     provincia == null || provincia.isEmpty() ||
