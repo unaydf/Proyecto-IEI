@@ -1,8 +1,10 @@
 package com.iei.api_carga.extractor;
 
+import com.iei.api_carga.dto.ResultadoCargaDTO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.sql.*;
 import java.util.HashMap;
@@ -18,135 +20,191 @@ public class ExtractorCV {
     @Value("${spring.datasource.password}")
     private String password;
 
-    // Caché para evitar consultas repetitivas dentro de la misma ejecución
     private final Map<String, Long> provinciaCache = new HashMap<>();
     private final Map<String, Long> localidadCache = new HashMap<>();
 
-    public void insertar(JsonNode estacionesArray) throws Exception {
-        // Usamos try-with-resources para asegurar el cierre de la conexión
+    public ResultadoCargaDTO insertar(JsonNode estacionesArray) throws Exception {
+        ResultadoCargaDTO resultado = new ResultadoCargaDTO();
+        resultado.setErroresRechazados(new java.util.ArrayList<>());
+        resultado.setErroresReparados(new java.util.ArrayList<>());
+
         try (Connection conn = DriverManager.getConnection(url, user, password)) {
-            conn.setAutoCommit(false); // Desactivar auto-commit para transacciones en bloque
+            conn.setAutoCommit(false);
 
             for (JsonNode estacion : estacionesArray) {
 
-                // 1. VALIDACIÓN PREVIA
-                // Si la estación no cumple las reglas (incluida la de móvil/agrícola), la saltamos.
-                if (!estacionValida(estacion)) {
-                    continue;
+                // Limpiar datos
+                limpiarEstacion(estacion);
+
+                // Validar estación
+                if (!estacionValida(estacion, resultado)) {
+                    continue; // se añade automáticamente a erroresRechazados
                 }
 
                 try {
-                    // 2. GESTIÓN DE PROVINCIA (Busca o Inserta)
+                    // Provincia
                     String provinciaNombre = safeText(estacion.get("provincia_nombre"));
-                    // Usamos el nombre como clave si no hay código, para la caché
                     String provinciaKey = (provinciaNombre != null) ? provinciaNombre : "UNKNOWN";
-
                     long provinciaId = getOrInsertProvincia(conn, provinciaNombre, provinciaKey);
 
-                    // 3. GESTIÓN DE LOCALIDAD (Busca o Inserta)
+                    // Localidad
                     String localidadNombre = safeText(estacion.get("localidad_nombre"));
-                    // Si viene nulo (caso estaciones móviles válidas), manejamos un default o saltamos según lógica de negocio.
-                    // Asumiremos que para insertar en BD relacional necesitamos localidad,
-                    // pero si la validación móvil permite nulos, aquí debemos tener cuidado.
-                    if (localidadNombre == null) {
-                        localidadNombre = "Desconocida"; // O manejar según tu esquema
-                    }
+                    if (localidadNombre == null) localidadNombre = "Desconocida";
                     String localidadKey = localidadNombre + "_" + provinciaId;
-
                     long localidadId = getOrInsertLocalidad(conn, localidadNombre, provinciaId, localidadKey);
 
-                    // 4. INSERTAR ESTACIÓN (Evitando duplicados)
-                    if (!existeEstacion(conn, estacion.get("nombre").asText(), localidadId)) {
+                    // Insertar estación si no existe
+                    String nombreEstacion = safeText(estacion.get("nombre"));
+                    if (!existeEstacion(conn, nombreEstacion, localidadId)) {
                         insertarEstacion(conn, estacion, localidadId);
+                        resultado.setRegistrosCorrectos(resultado.getRegistrosCorrectos() + 1);
                     } else {
-                        System.out.println("Estación duplicada omitida: " + estacion.get("nombre").asText());
+                        resultado.getErroresReparados().add(
+                                new ResultadoCargaDTO.ErrorReparado(
+                                        "CV",
+                                        nombreEstacion,
+                                        localidadNombre,
+                                        "Registro duplicado",
+                                        "Ignorado"
+                                )
+                        );
+                        resultado.setRegistrosConErroresReparados(resultado.getRegistrosConErroresReparados() + 1);
                     }
 
                 } catch (SQLException e) {
-                    // Si falla una estación concreta, hacemos rollback parcial o log y seguimos?
-                    // Aquí imprimimos y seguimos con la siguiente para no detener toda la carga.
-                    System.err.println("Error procesando estación: " + estacion.get("nombre"));
-                    e.printStackTrace();
+                    // Error al procesar una estación concreta
+                    resultado.getErroresRechazados().add(
+                            new ResultadoCargaDTO.ErrorRechazado(
+                                    "CV",
+                                    safeText(estacion.get("nombre")),
+                                    safeText(estacion.get("localidad_nombre")),
+                                    "Error SQL: " + e.getMessage()
+                            )
+                    );
+                    resultado.setRegistrosRechazados(resultado.getRegistrosRechazados() + 1);
                 }
             }
 
-            conn.commit(); // Confirmar cambios al final
-            System.out.println("Proceso de carga finalizado.");
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
+            conn.commit();
         }
+
+        return resultado;
     }
 
-    /**
-     * Valida si la estación cumple los requisitos para ser insertada.
-     */
-    private boolean estacionValida(JsonNode e) {
+    // =========================================
+    // VALIDACIÓN
+    // =========================================
+    private boolean estacionValida(JsonNode e, ResultadoCargaDTO resultado) {
         String tipo = safeText(e.get("tipo"));
-        if (tipo == null) return false;
+        String nombre = safeText(e.get("nombre"));
+        String localidad = safeText(e.get("localidad_nombre"));
+        String provincia = safeText(e.get("provincia_nombre"));
+        String cp = safeText(e.get("codigo_postal"));
+        String contacto = safeText(e.get("contacto"));
 
-        // --- REGLA ESPECÍFICA: ESTACIONES MÓVILES O AGRÍCOLAS ---
-        // "Si una estacion movil o agricola tiene datos de codigo_postal o localidad_nombre no se debe insertar"
-        if ("Estación móvil".equalsIgnoreCase(tipo) || "Agricola".equalsIgnoreCase(tipo) || "Otros".equalsIgnoreCase(tipo)) {
-            boolean tieneCP = !isEmpty(e, "codigo_postal");
-            boolean tieneLocalidad = !isEmpty(e, "localidad_nombre");
+        Double lat = safeCoordinateLat(e.get("latitud"));
+        Double lon = safeCoordinateLong(e.get("longitud"));
 
-            // Si TIENE datos de ubicación fija, es INVALIDA para este tipo según la regla.
-            if (tieneCP || tieneLocalidad) {
-                return false;
+        boolean valido = true;
+        String motivo = "";
+
+        if (tipo == null) {
+            motivo = "Tipo de estación nulo";
+            valido = false;
+        } else if ("Estación móvil".equalsIgnoreCase(tipo) ||
+                "Agricola".equalsIgnoreCase(tipo) ||
+                "Otros".equalsIgnoreCase(tipo)) {
+
+            // Para estas, CP y localidad no deben estar
+            if ((cp != null && !cp.isEmpty()) || (localidad != null && !localidad.isEmpty())) {
+                motivo = "Estación móvil/agrícola con ubicación fija";
+                valido = false;
+            }
+            // Debe tener contacto válido
+            if (contacto == null || !contacto.contains("@")) {
+                motivo = "Contacto inválido";
+                valido = false;
             }
 
-            // Si pasa el filtro anterior, validamos que tenga al menos coordenadas y contacto
-            if (!isEmpty(e, "latitud") || !isEmpty(e, "longitud")) return false;
+        } else if ("Estación fija".equalsIgnoreCase(tipo)) {
+            if (nombre == null || nombre.isEmpty() ||
+                    localidad == null || localidad.isEmpty() ||
+                    provincia == null || provincia.isEmpty() ||
+                    cp == null || !cp.matches("\\d{5}") ||
+                    lat == null || lon == null ||
+                    contacto == null || !contacto.contains("@")) {
 
-            String contacto = safeText(e.get("contacto"));
-            // Validación simple de email (debe contener @)
-            if (contacto == null || !contacto.contains("@")) return false;
-
-            return true;
+                motivo = "Campos obligatorios inválidos o coordenadas fuera de rango";
+                valido = false;
+            } else {
+                // Validar prefijo CP para Comunidad Valenciana
+                String prefijo = cp.substring(0, 2);
+                if (!prefijo.matches("03|12|46")) {
+                    motivo = "CP no pertenece a Comunidad Valenciana";
+                    valido = false;
+                }
+            }
+        } else {
+            motivo = "Tipo desconocido";
+            valido = false;
         }
 
-        // --- REGLA: ESTACIONES FIJAS ---
-        if ("Estación fija".equalsIgnoreCase(tipo)) {
-            if (isEmpty(e, "nombre")) return false;
-            if (isEmpty(e, "direccion")) return false;
-            if (isEmpty(e, "codigo_postal")) return false;
-            if (isEmpty(e, "localidad_nombre")) return false;
-            if (isEmpty(e, "provincia_nombre")) return false;
-
-            // Validar Horario
-            String horario = safeText(e.get("horario"));
-            if (!horarioValido(horario)) return false;
-
-            // Validar CP (Comunidad Valenciana: 03, 12, 46)
-            String cp = safeText(e.get("codigo_postal"));
-            if (cp == null || !cp.matches("\\d{5}")) return false;
-            String prefijo = cp.substring(0, 2);
-            if (!prefijo.matches("03|12|46")) return false;
-
-            // Validar Coordenadas numéricas
-            if (!isNumber(e, "latitud")) return false;
-            if (!isNumber(e, "longitud")) return false;
-
-            // Validar Contacto
-            String contacto = safeText(e.get("contacto"));
-            if (contacto == null || !contacto.contains("@")) return false;
-
-            return true;
+        if (!valido) {
+            resultado.getErroresRechazados().add(
+                    new ResultadoCargaDTO.ErrorRechazado("CV", nombre, localidad, motivo)
+            );
+            resultado.setRegistrosRechazados(resultado.getRegistrosRechazados() + 1);
         }
 
-        return false; // Tipo desconocido
+        return valido;
     }
 
-    // --- MÉTODOS DE SOPORTE DB (SELECT OR INSERT) ---
+    // =========================================
+    // UTILIDADES DE LIMPIEZA Y COORDENADAS
+    // =========================================
+    private void limpiarEstacion(JsonNode estacion) {
+        if (!(estacion instanceof ObjectNode)) return;
+        ObjectNode e = (ObjectNode) estacion;
 
+        e.put("nombre", clean(safeText(estacion.get("nombre"))));
+        e.put("direccion", clean(safeText(estacion.get("direccion"))));
+        e.put("codigo_postal", clean(safeText(estacion.get("codigo_postal"))));
+        e.put("descripcion", clean(safeText(estacion.get("descripcion"))));
+        e.put("horario", clean(safeText(estacion.get("horario"))));
+        e.put("contacto", clean(safeText(estacion.get("contacto"))));
+        e.put("URL", clean(safeText(estacion.get("URL"))));
+
+        e.put("latitud", safeCoordinateLat(estacion.get("latitud")));
+        e.put("longitud", safeCoordinateLong(estacion.get("longitud")));
+    }
+
+    private String clean(String s) {
+        if (s == null) return null;
+        return s.replaceAll("[^\\p{L}\\p{N}\\s.,-]", "").trim();
+    }
+
+    private String safeText(JsonNode node) {
+        return (node == null || node.isNull()) ? null : node.asText().trim();
+    }
+
+    private Double safeCoordinateLat(JsonNode node) {
+        if (node == null || !node.isNumber()) return null;
+        double v = node.asDouble();
+        return (v >= 38 && v <= 42) ? v : null; // Valencia aproximada
+    }
+
+    private Double safeCoordinateLong(JsonNode node) {
+        if (node == null || !node.isNumber()) return null;
+        double v = node.asDouble();
+        return (v >= -1 && v <= 1) ? v : null; // Valencia aproximada
+    }
+
+    // =========================================
+    // MÉTODOS DE DB
+    // =========================================
     private long getOrInsertProvincia(Connection conn, String nombre, String cacheKey) throws SQLException {
-        if (provinciaCache.containsKey(cacheKey)) {
-            return provinciaCache.get(cacheKey);
-        }
+        if (provinciaCache.containsKey(cacheKey)) return provinciaCache.get(cacheKey);
 
-        // 1. Intentar buscar
         String selectSql = "SELECT codigo FROM provincia WHERE nombre = ?";
         try (PreparedStatement stmt = conn.prepareStatement(selectSql)) {
             stmt.setString(1, nombre);
@@ -158,7 +216,6 @@ public class ExtractorCV {
             }
         }
 
-        // 2. Si no existe, insertar
         String insertSql = "INSERT INTO provincia(nombre) VALUES (?) RETURNING codigo";
         try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
             stmt.setString(1, nombre);
@@ -174,11 +231,8 @@ public class ExtractorCV {
     }
 
     private long getOrInsertLocalidad(Connection conn, String nombre, long provinciaId, String cacheKey) throws SQLException {
-        if (localidadCache.containsKey(cacheKey)) {
-            return localidadCache.get(cacheKey);
-        }
+        if (localidadCache.containsKey(cacheKey)) return localidadCache.get(cacheKey);
 
-        // 1. Intentar buscar (filtrando por provincia para evitar coincidencias de nombre en distintas provincias)
         String selectSql = "SELECT codigo FROM localidad WHERE nombre = ? AND provincia_codigo = ?";
         try (PreparedStatement stmt = conn.prepareStatement(selectSql)) {
             stmt.setString(1, nombre);
@@ -191,7 +245,6 @@ public class ExtractorCV {
             }
         }
 
-        // 2. Si no existe, insertar
         String insertSql = "INSERT INTO localidad(nombre, provincia_codigo) VALUES (?, ?) RETURNING codigo";
         try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
             stmt.setString(1, nombre);
@@ -208,7 +261,6 @@ public class ExtractorCV {
     }
 
     private boolean existeEstacion(Connection conn, String nombre, long localidadId) throws SQLException {
-        // Verificamos duplicados por Nombre + Localidad (ajustar según criterio de unicidad)
         String sql = "SELECT 1 FROM estacion WHERE nombre = ? AND localidad_id = ?";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, nombre);
@@ -220,11 +272,11 @@ public class ExtractorCV {
 
     private void insertarEstacion(Connection conn, JsonNode estacion, long localidadId) throws SQLException {
         String sql = """
-                    INSERT INTO estacion(
-                        nombre, tipo, direccion, codigo_postal,
-                        longitud, latitud, descripcion, horario,
-                        contacto, url, localidad_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO estacion(
+                    nombre, tipo, direccion, codigo_postal,
+                    longitud, latitud, descripcion, horario,
+                    contacto, url, localidad_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -237,31 +289,11 @@ public class ExtractorCV {
             stmt.setString(7, safeText(estacion.get("descripcion")));
             stmt.setString(8, safeText(estacion.get("horario")));
             stmt.setString(9, safeText(estacion.get("contacto")));
-            stmt.setString(10, safeText(estacion.get("URL"))); // Ojo mayus/minus en JSON
+            stmt.setString(10, safeText(estacion.get("URL")));
             stmt.setLong(11, localidadId);
 
             stmt.executeUpdate();
         }
-    }
-
-    // --- UTILIDADES ---
-
-    private boolean horarioValido(String h) {
-        if (h == null || h.trim().isEmpty()) return false;
-        // Regex básica para detectar formato hora HH:MM
-        return h.matches(".*([01]?\\d|2[0-3]):[0-5]\\d.*");
-    }
-
-    private boolean isEmpty(JsonNode e, String f) {
-        return !e.has(f) || e.get(f).isNull() || e.get(f).asText().trim().isEmpty();
-    }
-
-    private boolean isNumber(JsonNode e, String f) {
-        return e.has(f) && e.get(f).isNumber();
-    }
-
-    private String safeText(JsonNode node) {
-        return (node == null || node.isNull()) ? null : node.asText().trim();
     }
 
     private void setNullableDouble(PreparedStatement stmt, int idx, JsonNode node) throws SQLException {

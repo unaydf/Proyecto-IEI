@@ -1,5 +1,6 @@
 package com.iei.api_carga.extractor;
 
+import com.iei.api_carga.dto.ResultadoCargaDTO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,19 +23,29 @@ public class ExtractorCat {
     private final Map<String, Long> provinciaCache = new HashMap<>();
     private final Map<String, Long> localidadCache = new HashMap<>();
 
-    public void insertar(JsonNode estacionesArray) throws Exception {
+    private static final Map<String, String> PROVINCIA_POR_CP = Map.of(
+            "08", "Barcelona",
+            "17", "Girona",
+            "25", "Lleida",
+            "43", "Tarragona"
+    );
+
+    public ResultadoCargaDTO insertar(JsonNode estacionesArray) throws Exception {
+        ResultadoCargaDTO resultado = new ResultadoCargaDTO();
+        resultado.setErroresRechazados(new java.util.ArrayList<>());
+        resultado.setErroresReparados(new java.util.ArrayList<>());
 
         try (Connection conn = DriverManager.getConnection(url, user, password)) {
             conn.setAutoCommit(false);
 
             for (JsonNode estacion : estacionesArray) {
 
-                if (!estacionValida(estacion)) {
-                    System.out.println("Estación rechazada por datos inválidos: " + estacion);
-                    continue;
-                }
-
+                // Limpiamos los strings
                 limpiarEstacion(estacion);
+
+                if (!estacionValida(estacion, resultado)) {
+                    continue; // se añade al listado de errores rechazados dentro de estacionValida
+                }
 
                 String provinciaNombre = safeText(estacion, "provincia_nombre");
                 String provinciaCodigoKey = safeText(estacion, "provincia_codigo");
@@ -52,56 +63,63 @@ public class ExtractorCat {
 
                 if (!estacionExiste(conn, safeText(estacion, "nombre"), localidadId)) {
                     insertarEstacion(conn, estacion, localidadId);
+                    resultado.setRegistrosCorrectos(resultado.getRegistrosCorrectos() + 1);
+                } else {
+                    // Registro duplicado, consideramos que se actualiza o se ignora
+                    resultado.getErroresReparados().add(
+                            new ResultadoCargaDTO.ErrorReparado(
+                                    "CAT",
+                                    safeText(estacion, "nombre"),
+                                    localidadNombre,
+                                    "Registro duplicado",
+                                    "Ignorado"
+                            )
+                    );
+                    resultado.setRegistrosConErroresReparados(resultado.getRegistrosConErroresReparados() + 1);
                 }
             }
 
             conn.commit();
-            System.out.println("✔ Inserción Multi-Entidad XML completada correctamente.");
         }
+
+        return resultado;
     }
 
-    private static final Map<String, String> PROVINCIA_POR_CP = Map.of(
-            "08", "Barcelona",
-            "17", "Girona",
-            "25", "Lleida",
-            "43", "Tarragona"
-    );
+    private boolean estacionValida(JsonNode e, ResultadoCargaDTO resultado) {
+        String nombre = safeText(e, "nombre");
+        String direccion = safeText(e, "direccion");
+        String cp = safeText(e, "codigo_postal");
+        String localidad = safeText(e, "localidad_nombre");
+        String provincia = safeText(e, "provincia_nombre");
+        Double lat = safeCoordinateLat(e, "latitud");
+        Double lon = safeCoordinateLong(e, "longitud");
 
-    private String provinciaSegunCP(String codigoPostal) {
-        if (codigoPostal == null || codigoPostal.length() < 2) return null;
+        boolean valido = true;
+        String motivo = "";
 
-        String prefijo = codigoPostal.substring(0, 2);
-        return PROVINCIA_POR_CP.get(prefijo);
-    }
+        if (nombre == null || direccion == null || cp == null || localidad == null || provincia == null) {
+            motivo = "Campo obligatorio nulo";
+            valido = false;
+        } else if (cp.length() != 5) {
+            motivo = "Código postal inválido";
+            valido = false;
+        } else if (PROVINCIA_POR_CP.containsKey(cp.substring(0, 2)) &&
+                !PROVINCIA_POR_CP.get(cp.substring(0, 2)).equalsIgnoreCase(provincia)) {
+            motivo = "Código postal no coincide con provincia";
+            valido = false;
+        } else if (lat == null || lon == null) {
+            motivo = "Coordenadas fuera de rango";
+            valido = false;
+        }
 
-    private String safeText(JsonNode node, String field) {
-        JsonNode value = node.get(field);
-        if (value == null || value.isNull()) return null;
+        if (!valido) {
+            resultado.getErroresRechazados().add(
+                    new ResultadoCargaDTO.ErrorRechazado("CAT", nombre, localidad, motivo)
+            );
+            resultado.setRegistrosRechazados(resultado.getRegistrosRechazados() + 1);
+        }
 
-        String text = value.asText().trim();
-        return text.isEmpty() ? null : text;
-    }
-
-    private Double safeCoordinateLat(JsonNode node, String field) {
-        JsonNode value = node.get(field);
-        if (value == null || !value.isNumber()) return null;
-
-        double v = value.asDouble();
-
-        if (v > 43 || v < 40) return null;
-
-        return v;
-    }
-
-    private Double safeCoordinateLong(JsonNode node, String field) {
-        JsonNode value = node.get(field);
-        if (value == null || !value.isNumber()) return null;
-
-        double v = value.asDouble();
-
-        if (v > 3 || v < -1) return null;
-
-        return v;
+        return valido;
     }
 
     private void limpiarEstacion(JsonNode estacion) {
@@ -127,36 +145,28 @@ public class ExtractorCat {
         return s.replaceAll("[^\\p{L}\\p{N}\\s.,-]", "").trim();
     }
 
-    private boolean estacionValida(JsonNode e) {
+    private String safeText(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) return null;
+        String text = value.asText().trim();
+        return text.isEmpty() ? null : text;
+    }
 
-        if (safeText(e, "nombre") == null) return false;
+    private Double safeCoordinateLat(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || !value.isNumber()) return null;
+        double v = value.asDouble();
+        return (v >= 39 && v <= 46) ? v : null;
+    }
 
-        if (safeCoordinateLat(e, "latitud") == null) return false;
-        if (safeCoordinateLong(e, "longitud") == null) return false;
-
-        if (safeText(e, "direccion") == null) return false;
-        if (safeText(e, "codigo_postal") == null) return false;
-        if (safeText(e, "localidad_nombre") == null) return false;
-        if (safeText(e, "provincia_nombre") == null) return false;
-
-        String cp = safeText(e, "codigo_postal");
-        String provinciaXML = safeText(e, "provincia_nombre");
-
-        String provinciaPorCP = provinciaSegunCP(cp);
-
-        if (provinciaPorCP != null && provinciaXML != null) {
-            if (!provinciaPorCP.equalsIgnoreCase(provinciaXML)) {
-                System.out.println("Inconsistencia: CP " + cp + " indica " + provinciaPorCP +
-                        " pero XML dice " + provinciaXML);
-                return false;
-            }
-        }
-
-        return true;
+    private Double safeCoordinateLong(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || !value.isNumber()) return null;
+        double v = value.asDouble();
+        return (v >= -9 && v <= -4) ? v : null;
     }
 
     private void insertarEstacion(Connection conn, JsonNode estacion, long localidadId) throws SQLException {
-
         String sql = """
                 INSERT INTO estacion(
                     nombre, tipo, direccion,
@@ -167,7 +177,6 @@ public class ExtractorCat {
                 """;
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-
             stmt.setString(1, safeText(estacion, "nombre"));
             stmt.setString(2, safeText(estacion, "tipo"));
             stmt.setString(3, safeText(estacion, "direccion"));
@@ -222,7 +231,6 @@ public class ExtractorCat {
 
     private long getOrInsertLocalidad(Connection conn, String nombre, long provinciaId, String localidadKey)
             throws SQLException {
-
         String selectSql = "SELECT codigo FROM localidad WHERE nombre = ? AND provincia_codigo = ?";
         try (PreparedStatement stmt = conn.prepareStatement(selectSql)) {
             stmt.setString(1, nombre);
