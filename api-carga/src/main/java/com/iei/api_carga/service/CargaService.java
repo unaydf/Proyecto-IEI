@@ -48,23 +48,21 @@ public class CargaService {
 
         for (String fuente : fuentes) {
             try {
-                ResultadoCargaDTO resultado = null;
-                switch (fuente.toUpperCase()) {
-                    case "GAL":
+                ResultadoCargaDTO resultado = switch (fuente.toUpperCase()) {
+                    case "GAL" -> {
                         JsonNode jsonGal = cargaClient.getEstacionesGalicia();
-                        resultado = extractorGal.insertar(jsonGal);
-                        break;
-                    case "CAT":
+                        yield extractorGal.insertar(jsonGal);
+                    }
+                    case "CAT" -> {
                         JsonNode jsonCat = cargaClient.getEstacionesCatalunya();
-                        //resultado = extractorCat.insertar(jsonCat);
-                        break;
-                    case "CV":
+                        yield extractorCat.insertar(jsonCat);
+                    }
+                    case "CV" -> {
                         JsonNode jsonCV = cargaClient.getEstacionesCV();
-                        //resultado = extractorCV.insertar(jsonCV);
-                        break;
-                    default:
-                        throw new RuntimeException("Fuente desconocida: " + fuente);
-                }
+                        yield extractorCV.insertar(jsonCV);
+                    }
+                    default -> throw new RuntimeException("Fuente desconocida: " + fuente);
+                };
 
                 if (resultado != null) {
                     totalCorrectos += resultado.getRegistrosCorrectos();
