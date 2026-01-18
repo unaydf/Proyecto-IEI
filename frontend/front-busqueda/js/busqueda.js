@@ -50,18 +50,20 @@ async function buscarEstaciones() {
     if (provincia) params.append('provincia', provincia);
     if (tipo) params.append('tipo', tipo);
 
-    const url = `${API_URL}/estaciones?${params.toString()}`;
+    // 🔹 Si no hay filtros → endpoint base
+    const url = params.toString()
+        ? `${API_URL}/estaciones?${params.toString()}`
+        : `${API_URL}/estaciones`;
 
     try {
-        const response = await fetch(url, {
-            method: 'GET'
-        });
+        const response = await fetch(url);
 
         if (!response.ok) {
-            throw new Error('Error en la búsqueda');
+            throw new Error(`Error ${response.status}`);
         }
 
         const estaciones = await response.json();
+
         mostrarResultados(estaciones);
         mostrarEnMapa(estaciones);
 
@@ -70,13 +72,13 @@ async function buscarEstaciones() {
 
         if (error instanceof TypeError) {
             mostrarError(
-                'No se pudo conectar con el servidor',
-                'El servicio de búsqueda no está disponible en este momento. Inténtalo más tarde.'
+                'Servidor no disponible',
+                'No se pudo conectar con el servicio de estaciones ITV.'
             );
         } else {
             mostrarError(
                 'Error en la búsqueda',
-                error.message || 'Se produjo un error inesperado'
+                'No fue posible obtener los datos solicitados.'
             );
         }
     }
@@ -193,6 +195,8 @@ function ocultarInfo() {
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
+
+    buscarEstaciones();
 
     document.getElementById('btn-buscar').addEventListener('click', buscarEstaciones);
     document.getElementById('btn-cancelar').addEventListener('click', limpiarFormulario);
