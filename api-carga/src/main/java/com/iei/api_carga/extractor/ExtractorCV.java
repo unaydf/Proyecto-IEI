@@ -33,23 +33,23 @@ public class ExtractorCV {
 
             for (JsonNode estacion : estacionesArray) {
 
-                // Limpiar datos
-                limpiarEstacion(estacion);
-
-                // Validar estación
+                // Validar estación ANTES de limpiar
                 if (!estacionValida(estacion, resultado)) {
                     continue; // se añade automáticamente a erroresRechazados
                 }
 
+                // Limpiar datos solo si la validación pasó
+                limpiarEstacion(estacion);
+
                 try {
                     // Provincia
                     String provinciaNombre = safeText(estacion.get("provincia_nombre"));
-                    String provinciaKey = (provinciaNombre != null) ? provinciaNombre : "UNKNOWN";
+                    String provinciaKey = (provinciaNombre != null && !provinciaNombre.equals("null")) ? provinciaNombre : "UNKNOWN";
                     long provinciaId = getOrInsertProvincia(conn, provinciaNombre, provinciaKey);
 
                     // Localidad
                     String localidadNombre = safeText(estacion.get("localidad_nombre"));
-                    if (localidadNombre == null) localidadNombre = "Desconocida";
+                    if (localidadNombre == null || localidadNombre.equals("null")) localidadNombre = "Desconocida";
                     String localidadKey = localidadNombre + "_" + provinciaId;
                     long localidadId = getOrInsertLocalidad(conn, localidadNombre, provinciaId, localidadKey);
 
@@ -100,13 +100,12 @@ public class ExtractorCV {
         String localidad = safeText(e.get("localidad_nombre"));
         String provincia = safeText(e.get("provincia_nombre"));
         String cp = safeText(e.get("codigo_postal"));
-        String contacto = safeText(e.get("contacto"));
 
-        Double lat = safeCoordinateLat(e.get("latitud"));
-        Double lon = safeCoordinateLong(e.get("longitud"));
+        String latStr = (e.get("latitud") != null) ? e.get("latitud").asText() : null;
+        String lonStr = (e.get("longitud") != null) ? e.get("longitud").asText() : null;
 
-        boolean valido = true; // Asumimos que es válido al principio
-        StringBuilder motivo = new StringBuilder(); // Motivo para rechazo
+        boolean valido = true;
+        StringBuilder motivo = new StringBuilder();
 
         if (tipo == null) {
             motivo.append("Tipo de estación nulo. ");
@@ -117,25 +116,34 @@ public class ExtractorCV {
                     "Agricola".equalsIgnoreCase(tipo) ||
                     "Otros".equalsIgnoreCase(tipo)) {
 
-                // Verificar que esos campos estén marcados explícitamente como "null"
-                if (!"null".equals(localidad)) {
-                    motivo.append("Localidad debe ser 'null' para estaciones móviles/agrícolas/otros. ");
+                // Verificar que NO tengan los campos prohibidos
+                boolean tieneLocalidad = localidad != null && !localidad.isEmpty() && !localidad.equals("null");
+                boolean tieneProvincia = provincia != null && !provincia.isEmpty() && !provincia.equals("null");
+                boolean tieneCP = cp != null && !cp.isEmpty() && !cp.equals("null");
+                boolean tieneLat = latStr != null && !latStr.isEmpty() && !latStr.equals("null");
+                boolean tieneLon = lonStr != null && !lonStr.isEmpty() && !lonStr.equals("null");
+
+                if (tieneLocalidad) {
+                    motivo.append("Estación móvil/agrícola/otro no puede tener localidad. ");
                     valido = false;
                 }
-                if (!"null".equals(provincia)) {
-                    motivo.append("Provincia debe ser 'null' para estaciones móviles/agrícolas/otros. ");
+                if (tieneProvincia) {
+                    motivo.append("Estación móvil/agrícola/otro no puede tener provincia. ");
                     valido = false;
                 }
-                if (!"null".equals(cp)) {
-                    motivo.append("Código postal debe ser 'null' para estaciones móviles/agrícolas/otros. ");
+                if (tieneCP) {
+                    motivo.append("Estación móvil/agrícola/otro no puede tener código postal. ");
                     valido = false;
                 }
-                if (!"null".equals(e.get("latitud").asText()) || !"null".equals(e.get("longitud").asText())) {
-                    motivo.append("Coordenadas deben ser 'null' para estaciones móviles/agrícolas/otros. ");
+                if (tieneLat) {
+                    motivo.append("Estación móvil/agrícola/otro no puede tener latitud. ");
+                    valido = false;
+                }
+                if (tieneLon) {
+                    motivo.append("Estación móvil/agrícola/otro no puede tener longitud. ");
                     valido = false;
                 }
             }
-
             // Validar estaciones fijas
             else if ("Estacion fija".equalsIgnoreCase(tipo)) {
                 if (nombre == null || nombre.isEmpty()) {
@@ -161,8 +169,13 @@ public class ExtractorCV {
                         valido = false;
                     }
                 }
+
+                // Validar coordenadas
+                Double lat = safeCoordinateLat(e.get("latitud"));
+                Double lon = safeCoordinateLong(e.get("longitud"));
+
                 if (lat == null || lon == null) {
-                    motivo.append("Coordenadas inválidas o fuera de rango (lat: ").append(lat).append(", lon: ").append(lon).append("). ");
+                    motivo.append("Coordenadas inválidas o fuera de rango para estación fija (lat: ").append(latStr).append(", lon: ").append(lonStr).append("). ");
                     valido = false;
                 }
             } else {
@@ -194,9 +207,8 @@ public class ExtractorCV {
         ObjectNode e = (ObjectNode) estacion;
 
         String tipo = safeText(estacion.get("tipo"));
-        if (tipo == null) tipo = "Otros"; // Si es nulo, asumir "Otros" para evitar problemas en validación
 
-        // Móviles, Agrícolas, Otros: Asignar campos como "null"
+        // Móviles, Agrícolas, Otros: Asignar campos como string "null"
         if ("Estacion movil".equalsIgnoreCase(tipo) ||
                 "Agricola".equalsIgnoreCase(tipo) ||
                 "Otros".equalsIgnoreCase(tipo)) {
@@ -209,27 +221,47 @@ public class ExtractorCV {
 
         // Limpieza común para todos los campos
         e.put("nombre", clean(safeText(estacion.get("nombre"))));
-        e.put("direccion", clean(safeText(estacion.get("direccion"))));
-        e.put("codigo_postal", clean(safeText(estacion.get("codigo_postal"))));
-        e.put("descripcion", clean(safeText(estacion.get("descripcion"))));
-        e.put("horario", clean(safeText(estacion.get("horario"))));
-        e.put("contacto", clean(safeText(estacion.get("contacto"))));
-        e.put("URL", clean(safeText(estacion.get("URL"))));
 
-        // Coordenadas para estaciones fijas o verificar rango
-        if (!"Estacion movil".equalsIgnoreCase(tipo) && !"Agricola".equalsIgnoreCase(tipo) && !"Otros".equalsIgnoreCase(tipo)) {
-            e.put("latitud", safeCoordinateLat(estacion.get("latitud")));
-            e.put("longitud", safeCoordinateLong(estacion.get("longitud")));
+        // Campos opcionales: si son null, ponemos string "null"
+        String direccion = safeText(estacion.get("direccion"));
+        e.put("direccion", (direccion == null) ? "null" : clean(direccion));
+
+        String descripcion = safeText(estacion.get("descripcion"));
+        e.put("descripcion", (descripcion == null) ? "null" : clean(descripcion));
+
+        String horario = safeText(estacion.get("horario"));
+        e.put("horario", (horario == null) ? "null" : clean(horario));
+
+        String contacto = safeText(estacion.get("contacto"));
+        e.put("contacto", (contacto == null) ? "null" : clean(contacto));
+
+        String url = safeText(estacion.get("URL"));
+        e.put("URL", (url == null) ? "null" : clean(url));
+
+        // Para estaciones fijas, mantener coordenadas si son válidas
+        if ("Estacion fija".equalsIgnoreCase(tipo)) {
+            Double lat = safeCoordinateLat(estacion.get("latitud"));
+            Double lon = safeCoordinateLong(estacion.get("longitud"));
+
+            if (lat != null) {
+                e.put("latitud", lat);
+            }
+            if (lon != null) {
+                e.put("longitud", lon);
+            }
         }
     }
 
     private String clean(String s) {
-        if (s == null) return null;
-        return s.replaceAll("[^\\p{L}\\p{N}\\s.,@-]", "").trim();
+        if (s == null || s.equals("null")) return "null";
+        String cleaned = s.replaceAll("[^\\p{L}\\p{N}\\s.,@-]", "").trim();
+        return cleaned.isEmpty() ? "null" : cleaned;
     }
 
     private String safeText(JsonNode node) {
-        return (node == null || node.isNull()) ? null : node.asText().trim();
+        if (node == null || node.isNull()) return null;
+        String text = node.asText().trim();
+        return text.isEmpty() ? null : text;
     }
 
     private Double safeCoordinateLat(JsonNode node) {
@@ -327,25 +359,38 @@ public class ExtractorCV {
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, safeText(estacion.get("nombre")));
             stmt.setString(2, safeText(estacion.get("tipo")));
-            stmt.setString(3, safeText(estacion.get("direccion")));
-            stmt.setString(4, safeText(estacion.get("codigo_postal")));
+            stmt.setString(3, safeTextOrNull(estacion.get("direccion")));
+            stmt.setString(4, safeTextOrNull(estacion.get("codigo_postal")));
             setNullableDouble(stmt, 5, estacion.get("longitud"));
             setNullableDouble(stmt, 6, estacion.get("latitud"));
-            stmt.setString(7, safeText(estacion.get("descripcion")));
-            stmt.setString(8, safeText(estacion.get("horario")));
-            stmt.setString(9, safeText(estacion.get("contacto")));
-            stmt.setString(10, safeText(estacion.get("URL")));
+            stmt.setString(7, safeTextOrNull(estacion.get("descripcion")));
+            stmt.setString(8, safeTextOrNull(estacion.get("horario")));
+            stmt.setString(9, safeTextOrNull(estacion.get("contacto")));
+            stmt.setString(10, safeTextOrNull(estacion.get("URL")));
             stmt.setLong(11, localidadId);
 
             stmt.executeUpdate();
         }
     }
 
+    private String safeTextOrNull(JsonNode node) {
+        if (node == null || node.isNull()) return "null";
+        String text = node.asText().trim();
+        return text.isEmpty() || text.equals("null") ? "null" : text;
+    }
+
     private void setNullableDouble(PreparedStatement stmt, int idx, JsonNode node) throws SQLException {
-        if (node == null || node.isNull() || !node.isNumber()) {
+        if (node == null || node.isNull()) {
             stmt.setNull(idx, Types.DOUBLE);
         } else {
-            stmt.setDouble(idx, node.asDouble());
+            String text = node.asText();
+            if (text.equals("null")) {
+                stmt.setNull(idx, Types.DOUBLE);
+            } else if (node.isNumber()) {
+                stmt.setDouble(idx, node.asDouble());
+            } else {
+                stmt.setNull(idx, Types.DOUBLE);
+            }
         }
     }
 }

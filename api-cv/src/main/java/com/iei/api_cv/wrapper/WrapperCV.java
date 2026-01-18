@@ -14,8 +14,6 @@ import java.io.IOException;
 public class WrapperCV {
 
     private final ObjectMapper mapper = new ObjectMapper();
-    private int contadorMovil = 1;
-    private int contadorAgricola = 1;
 
     public JsonNode convertirAJSON(String filePath) throws IOException {
 
@@ -61,7 +59,7 @@ public class WrapperCV {
 
             else if (tipoRaw.contains("móvil")) {
 
-                estacion.put("nombre", "Estación ITV Móvil " + (contadorMovil++));
+                estacion.put("nombre", "Estación ITV Móvil " + direccion);
                 estacion.put("tipo", "Estacion movil");
 
                 estacion.putNull("direccion");
@@ -74,7 +72,7 @@ public class WrapperCV {
 
             else if (tipoRaw.contains("agrícola")) {
 
-                estacion.put("nombre", "Estación ITV Agrícola " + (contadorAgricola++));
+                estacion.put("nombre", "Estación ITV Agrícola " + direccion);
                 estacion.put("tipo", "Otros");
 
                 estacion.putNull("direccion");
