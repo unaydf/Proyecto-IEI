@@ -1,6 +1,8 @@
 // Configuración de la API
 const API_URL = 'http://localhost:9002/api/carga';
 
+// ===================== Manejo de checkboxes =====================
+
 // Manejar checkbox "Seleccionar todas"
 function configurarCheckboxTodas() {
     const checkTodas = document.getElementById('check-todas');
@@ -29,77 +31,12 @@ function limpiarSeleccion() {
     limpiarResultados();
 }
 
+// ===================== Resultados =====================
+
 // Limpiar resultados
 function limpiarResultados() {
     const resultsContainer = document.getElementById('results-container');
     resultsContainer.innerHTML = '<p class="info-text">Selecciona fuentes y haz clic en "Cargar" para empezar</p>';
-}
-
-// Obtener fuentes seleccionadas
-function obtenerFuentesSeleccionadas() {
-    const fuentesCheckboxes = document.querySelectorAll('.fuente-checkbox:checked');
-    return Array.from(fuentesCheckboxes).map(cb => cb.value);
-}
-
-// Cargar datos
-async function cargarDatos() {
-    const fuentes = obtenerFuentesSeleccionadas();
-
-    if (fuentes.length === 0) {
-        alert('Por favor, selecciona al menos una fuente');
-        return;
-    }
-
-    mostrarCargando(true);
-
-    try {
-        const queryParams = new URLSearchParams();
-        fuentes.forEach(fuente => queryParams.append('fuentes', fuente));
-
-        const response = await fetch(`${API_URL}/cargar?${queryParams.toString()}`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
-
-        const resultado = await response.json();
-        mostrarResultadosCarga(resultado);
-
-    } catch (error) {
-        console.error('Error:', error);
-        mostrarError('Error al cargar datos: ' + error.message);
-    } finally {
-        mostrarCargando(false);
-    }
-}
-
-// Borrar almacén de datos
-async function borrarAlmacen() {
-    if (!confirm('¿Estás seguro de que deseas borrar todos los datos del almacén? Esta acción no se puede deshacer.')) {
-        return;
-    }
-
-    mostrarCargando(true);
-
-    try {
-        const response = await fetch(`${API_URL}/borrar`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) {
-            throw new Error('Error al borrar el almacén');
-        }
-
-        const mensaje = await response.text();
-        mostrarMensajeExito('Almacén de datos borrado correctamente');
-
-    } catch (error) {
-        console.error('Error:', error);
-        mostrarError('Error al borrar el almacén: ' + error.message);
-    } finally {
-        mostrarCargando(false);
-    }
 }
 
 // Mostrar/ocultar indicador de carga
@@ -217,11 +154,99 @@ function mostrarError(mensaje) {
     resultsContainer.innerHTML = `<div class="error-message">${mensaje}</div>`;
 }
 
-// Event listeners
+// ===================== Fuentes =====================
+
+// Obtener fuentes seleccionadas
+function obtenerFuentesSeleccionadas() {
+    const fuentesCheckboxes = document.querySelectorAll('.fuente-checkbox:checked');
+    return Array.from(fuentesCheckboxes).map(cb => cb.value);
+}
+
+// ===================== Cargar datos =====================
+
+async function cargarDatos() {
+    const fuentes = obtenerFuentesSeleccionadas();
+
+    if (fuentes.length === 0) {
+        alert('Por favor, selecciona al menos una fuente');
+        return;
+    }
+
+    mostrarCargando(true);
+
+    try {
+        const queryParams = new URLSearchParams();
+        fuentes.forEach(fuente => queryParams.append('fuentes', fuente));
+
+        const response = await fetch(`${API_URL}/cargar?${queryParams.toString()}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        const resultado = await response.json();
+        mostrarResultadosCarga(resultado);
+
+    } catch (error) {
+        console.error('Error:', error);
+        mostrarError('Error al cargar datos: ' + error.message);
+    } finally {
+        mostrarCargando(false);
+    }
+}
+
+// ===================== Borrar almacén =====================
+
+function borrarAlmacen() {
+    mostrarModalConfirmacion();
+}
+
+// ===================== Modal de confirmación =====================
+
+function mostrarModalConfirmacion() {
+    const modal = document.getElementById('confirm-modal');
+    modal.style.display = 'flex';
+}
+
+function ocultarModalConfirmacion() {
+    const modal = document.getElementById('confirm-modal');
+    modal.style.display = 'none';
+}
+
+async function confirmarBorrado() {
+    ocultarModalConfirmacion();
+    mostrarCargando(true);
+
+    try {
+        const response = await fetch(`${API_URL}/borrar`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            throw new Error('Error al borrar el almacén');
+        }
+
+        mostrarMensajeExito('Almacén de datos borrado correctamente');
+
+    } catch (error) {
+        console.error('Error:', error);
+        mostrarError('Error al borrar el almacén: ' + error.message);
+    } finally {
+        mostrarCargando(false);
+    }
+}
+
+// ===================== Eventos =====================
+
 document.addEventListener('DOMContentLoaded', () => {
     configurarCheckboxTodas();
 
     document.getElementById('btn-cargar').addEventListener('click', cargarDatos);
     document.getElementById('btn-cancelar').addEventListener('click', limpiarSeleccion);
     document.getElementById('btn-borrar').addEventListener('click', borrarAlmacen);
+
+    // Eventos del modal
+    document.getElementById('modal-cancel').addEventListener('click', ocultarModalConfirmacion);
+    document.getElementById('modal-confirm').addEventListener('click', confirmarBorrado);
 });
