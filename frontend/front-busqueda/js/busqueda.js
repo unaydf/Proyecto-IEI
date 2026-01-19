@@ -1,12 +1,30 @@
-// Configuración de la API
+// ================= CONFIGURACIÓN =================
 const API_URL = 'http://localhost:9001/api/busqueda';
 
-// Inicializar el mapa
 let map;
 let markersLayer;
 
+// Almacén global
+let todasLasEstaciones = [];
+let markersPorId = new Map();
+
+// ================= ESTILOS DE MARCADORES =================
+const ESTILO_NORMAL = {
+    radius: 6,
+    color: '#3388ff',
+    fillColor: '#3388ff',
+    fillOpacity: 0.8
+};
+
+const ESTILO_RESALTADO = {
+    radius: 8,
+    color: '#dc9606',
+    fillColor: '#f1c353',
+    fillOpacity: 0.95
+};
+
+// ================= MAPA =================
 function initMap() {
-    // Centro de España aproximadamente
     map = L.map('map').setView([40.4168, -3.7038], 6);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -17,23 +35,64 @@ function initMap() {
     markersLayer = L.layerGroup().addTo(map);
 }
 
-// Limpiar formulario
-function limpiarFormulario() {
-    document.getElementById('localidad').value = '';
-    document.getElementById('codigo-postal').value = '';
-    document.getElementById('provincia').value = '';
-    document.getElementById('tipo').value = '';
-    limpiarResultados();
+// ================= CARGA INICIAL =================
+async function cargarTodasLasEstaciones() {
+    try {
+        const response = await fetch(`${API_URL}/estaciones`);
+        if (!response.ok) throw new Error();
+
+        const estaciones = await response.json();
+        todasLasEstaciones = estaciones;
+
+        pintarTodasEnMapa(estaciones);
+        mostrarResultados(estaciones);
+
+    } catch (e) {
+        mostrarError(
+            'Error inicial',
+            'No se pudieron cargar las estaciones ITV.'
+        );
+    }
+}
+
+// ================= MAPA: PINTADO INICIAL =================
+function pintarTodasEnMapa(estaciones) {
     markersLayer.clearLayers();
+    markersPorId.clear();
+
+    const bounds = [];
+
+    estaciones.forEach(estacion => {
+        if (!estacion.latitud || !estacion.longitud) return;
+
+        const marker = L.circleMarker(
+            [estacion.latitud, estacion.longitud],
+            ESTILO_NORMAL
+        );
+
+        marker.bindTooltip(`
+            <strong>${estacion.nombre}</strong><br>
+            <strong>Tipo:</strong> ${estacion.tipo || 'N/A'}<br>
+            <strong>Dirección:</strong> ${estacion.direccion || 'N/A'}<br>
+            <strong>Localidad:</strong> ${estacion.localidadNombre || 'N/A'}<br>
+            <strong>CP:</strong> ${estacion.codigoPostal || 'N/A'}<br>
+            <strong>Provincia:</strong> ${estacion.provinciaNombre || 'N/A'}
+        `);
+
+        marker.addTo(markersLayer);
+
+        // IMPORTANTE: id único
+        markersPorId.set(estacion.id, marker);
+
+        bounds.push([estacion.latitud, estacion.longitud]);
+    });
+
+    if (bounds.length) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+    }
 }
 
-// Limpiar resultados
-function limpiarResultados() {
-    const tbody = document.getElementById('results-tbody');
-    tbody.innerHTML = '<tr><td colspan="7" class="no-results">Realiza una búsqueda para ver resultados</td></tr>';
-}
-
-// Buscar estaciones
+// ================= BÚSQUEDA =================
 async function buscarEstaciones() {
     ocultarError();
     ocultarInfo();
@@ -44,47 +103,57 @@ async function buscarEstaciones() {
     const tipo = document.getElementById('tipo').value;
 
     const params = new URLSearchParams();
-
     if (localidad) params.append('localidad', localidad);
     if (codigoPostal) params.append('codigoPostal', codigoPostal);
     if (provincia) params.append('provincia', provincia);
     if (tipo) params.append('tipo', tipo);
 
-    // 🔹 Si no hay filtros → endpoint base
     const url = params.toString()
         ? `${API_URL}/estaciones?${params.toString()}`
         : `${API_URL}/estaciones`;
 
     try {
         const response = await fetch(url);
-
-        if (!response.ok) {
-            throw new Error(`Error ${response.status}`);
-        }
+        if (!response.ok) throw new Error();
 
         const estaciones = await response.json();
 
         mostrarResultados(estaciones);
-        mostrarEnMapa(estaciones);
+        resaltarEstaciones(estaciones);
 
-    } catch (error) {
-        console.error('Error:', error);
-
-        if (error instanceof TypeError) {
-            mostrarError(
-                'Servidor no disponible',
-                'No se pudo conectar con el servicio de estaciones ITV.'
-            );
-        } else {
-            mostrarError(
-                'Error en la búsqueda',
-                'No fue posible obtener los datos solicitados.'
-            );
-        }
+    } catch (e) {
+        mostrarError(
+            'Error en la búsqueda',
+            'No fue posible obtener los datos solicitados.'
+        );
     }
 }
 
-// Mostrar resultados en la tabla
+// ================= RESALTADO =================
+function resaltarEstaciones(estacionesBusqueda) {
+    // Restaurar todos a normal
+    markersPorId.forEach(marker => {
+        marker.setStyle(ESTILO_NORMAL);
+    });
+
+    // Resaltar resultados
+    estacionesBusqueda.forEach(estacion => {
+        const marker = markersPorId.get(estacion.id);
+        if (marker) {
+            marker.setStyle(ESTILO_RESALTADO);
+            marker.bringToFront();
+        }
+    });
+
+    if (estacionesBusqueda.length === 0) {
+        mostrarInfo(
+            'Sin resultados',
+            'No se han encontrado estaciones con los criterios indicados.'
+        );
+    }
+}
+
+// ================= TABLA =================
 function mostrarResultados(estaciones) {
     const tbody = document.getElementById('results-tbody');
 
@@ -96,16 +165,9 @@ function mostrarResultados(estaciones) {
                 </td>
             </tr>
         `;
-
-        mostrarInfo(
-            'Sin resultados',
-            'No se han encontrado estaciones ITV que coincidan con la búsqueda realizada.'
-        );
-
         return;
     }
 
-    ocultarInfo();
     tbody.innerHTML = '';
 
     estaciones.forEach(estacion => {
@@ -123,53 +185,25 @@ function mostrarResultados(estaciones) {
     });
 }
 
-// Mostrar estaciones en el mapa
-function mostrarEnMapa(estaciones) {
-    // Limpiar marcadores anteriores
-    markersLayer.clearLayers();
+// ================= FORMULARIO =================
+function limpiarFormulario() {
+    document.getElementById('localidad').value = '';
+    document.getElementById('codigo-postal').value = '';
+    document.getElementById('provincia').value = '';
+    document.getElementById('tipo').value = '';
 
-    const bounds = [];
-
-    estaciones.forEach(estacion => {
-        if (estacion.latitud && estacion.longitud) {
-            const marker = L.marker([estacion.latitud, estacion.longitud]).addTo(markersLayer);
-
-            // Crear tooltip con información de la estación
-            const tooltipContent = `
-                <strong>${estacion.nombre}</strong><br>
-                <strong>Tipo:</strong> ${estacion.tipo || 'N/A'}<br>
-                <strong>Dirección:</strong> ${estacion.direccion || 'N/A'}<br>
-                <strong>Localidad:</strong> ${estacion.localidadNombre || 'N/A'}<br>
-                <strong>CP:</strong> ${estacion.codigoPostal || 'N/A'}<br>
-                <strong>Provincia:</strong> ${estacion.provinciaNombre || 'N/A'}
-            `;
-
-            marker.bindTooltip(tooltipContent, {
-                direction: 'top',
-                offset: [0, -10]
-            });
-
-            bounds.push([estacion.latitud, estacion.longitud]);
-        }
-    });
-
-    // Ajustar el mapa para mostrar todos los marcadores
-    if (bounds.length > 0) {
-        map.fitBounds(bounds, { padding: [50, 50] });
-    }
+    mostrarResultados(todasLasEstaciones);
+    resaltarEstaciones([]);
 }
 
+// ================= MENSAJES =================
 function mostrarError(titulo, mensaje) {
     const errorBox = document.getElementById('error-box');
     document.getElementById('error-title').textContent = titulo;
     document.getElementById('error-message').textContent = mensaje;
 
     errorBox.classList.remove('hidden');
-
-    // Ocultar automáticamente tras 6 segundos
-    setTimeout(() => {
-        errorBox.classList.add('hidden');
-    }, 6000);
+    setTimeout(() => errorBox.classList.add('hidden'), 6000);
 }
 
 function ocultarError() {
@@ -182,31 +216,30 @@ function mostrarInfo(titulo, mensaje) {
     document.getElementById('info-message').textContent = mensaje;
 
     infoBox.classList.remove('hidden');
-
-    setTimeout(() => {
-        infoBox.classList.add('hidden');
-    }, 5000);
+    setTimeout(() => infoBox.classList.add('hidden'), 5000);
 }
 
 function ocultarInfo() {
     document.getElementById('info-box').classList.add('hidden');
 }
 
-// Event listeners
+// ================= EVENTOS =================
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
+    cargarTodasLasEstaciones();
 
-    buscarEstaciones();
+    document.getElementById('btn-buscar')
+        .addEventListener('click', buscarEstaciones);
 
-    document.getElementById('btn-buscar').addEventListener('click', buscarEstaciones);
-    document.getElementById('btn-cancelar').addEventListener('click', limpiarFormulario);
+    document.getElementById('btn-cancelar')
+        .addEventListener('click', limpiarFormulario);
 
-    // Permitir búsqueda con Enter
-    document.querySelectorAll('.form-group input').forEach(input => {
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                buscarEstaciones();
-            }
+    document.querySelectorAll('.form-group input')
+        .forEach(input => {
+            input.addEventListener('keypress', e => {
+                if (e.key === 'Enter') {
+                    buscarEstaciones();
+                }
+            });
         });
-    });
 });
