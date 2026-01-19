@@ -117,7 +117,7 @@ public class ExtractorGal {
                                     "Registro duplicado"
                             )
                     );
-                    resultado.setRegistrosConErroresReparados(resultado.getRegistrosConErroresReparados() + 1);
+                    resultado.setRegistrosRechazados(resultado.getRegistrosRechazados() + 1);
                 }
             }
 
