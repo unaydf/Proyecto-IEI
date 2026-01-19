@@ -109,13 +109,12 @@ public class ExtractorGal {
                     resultado.setRegistrosCorrectos(resultado.getRegistrosCorrectos() + 1);
                 } else {
                     // Registro duplicado - se añade como error reparado (IGNORADO tiene prioridad)
-                    resultado.getErroresReparados().add(
-                            new ResultadoCargaDTO.ErrorReparado(
+                    resultado.getErroresRechazados().add(
+                            new ResultadoCargaDTO.ErrorRechazado(
                                     "GAL",
                                     nombreEstacion,
                                     localidadNombre,
-                                    "Registro duplicado",
-                                    "Ignorado"
+                                    "Registro duplicado"
                             )
                     );
                     resultado.setRegistrosConErroresReparados(resultado.getRegistrosConErroresReparados() + 1);

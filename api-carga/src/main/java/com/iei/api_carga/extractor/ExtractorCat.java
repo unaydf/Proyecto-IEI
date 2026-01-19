@@ -69,13 +69,12 @@ public class ExtractorCat {
                     resultado.setRegistrosCorrectos(resultado.getRegistrosCorrectos() + 1);
                 } else {
                     // Registro duplicado, consideramos que se actualiza o se ignora
-                    resultado.getErroresReparados().add(
-                            new ResultadoCargaDTO.ErrorReparado(
+                    resultado.getErroresRechazados().add(
+                            new ResultadoCargaDTO.ErrorRechazado(
                                     "CAT",
                                     safeText(estacion, "nombre"),
                                     localidadNombre,
-                                    "Registro duplicado",
-                                    "Ignorado"
+                                    "Registro duplicado"
                             )
                     );
                     resultado.setRegistrosConErroresReparados(resultado.getRegistrosConErroresReparados() + 1);

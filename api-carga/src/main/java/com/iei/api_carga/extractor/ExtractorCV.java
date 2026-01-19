@@ -62,13 +62,12 @@ public class ExtractorCV {
                         insertarEstacion(conn, estacion, localidadId);
                         resultado.setRegistrosCorrectos(resultado.getRegistrosCorrectos() + 1);
                     } else {
-                        resultado.getErroresReparados().add(
-                                new ResultadoCargaDTO.ErrorReparado(
+                        resultado.getErroresRechazados().add(
+                                new ResultadoCargaDTO.ErrorRechazado(
                                         "CV",
                                         nombreEstacion,
                                         localidadNombre,
-                                        "Registro duplicado",
-                                        "Ignorado"
+                                        "Registro duplicado"
                                 )
                         );
                         resultado.setRegistrosConErroresReparados(resultado.getRegistrosConErroresReparados() + 1);
@@ -344,7 +343,7 @@ public class ExtractorCV {
     private void insertarEstacion(Connection conn, JsonNode estacion, long localidadId) throws SQLException {
         String sql = """
                 INSERT INTO estacion(
-                    nombre, tipo, direccion, codigo_postal,
+                     nombre, tipo, direccion, codigo_postal,
                     longitud, latitud, descripcion, horario,
                     contacto, url, localidad_id
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
